@@ -112,8 +112,31 @@
 ```
     else if ((fh = f.hash) == MOVED)
         tab = helpTransfer(tab, f);
+	
+	final Node<K,V>[] helpTransfer(Node<K,V>[] tab, Node<K,V> f) {
+        Node<K,V>[] nextTab; int sc;
+        if (tab != null && (f instanceof ForwardingNode) &&
+            (nextTab = ((ForwardingNode<K,V>)f).nextTable) != null) {
+            int rs = resizeStamp(tab.length);
+            while (nextTab == nextTable && table == tab &&
+                   (sc = sizeCtl) < 0) {
+                if ((sc >>> RESIZE_STAMP_SHIFT) != rs || sc == rs + 1 ||
+                    sc == rs + MAX_RESIZERS || transferIndex <= 0)
+                    break;
+                // CAS方法将sc+1，表示有新的线程加入一起迁移    
+                if (U.compareAndSwapInt(this, SIZECTL, sc, sc + 1)) {
+                    transfer(tab, nextTab);
+                    break;
+                }
+            }
+            return nextTab;
+        }
+        return table;
+    }
 ```
-#### 这个if判断是hash值为MOVED，也就是-1。这是由于集群正在扩容以及对原有的节点进行移位。这在后面会再讲到,先看到下面这个if判断,这个判断就是若table桶位值已经存在了节点，那么就需要在后面接节点组成链表，链表长度超过阈值的时候，也要转成红黑树。在jdk 1.7的时候并不是这种处理方式的，但是在jdk 1.8的时候变成了和HashMap同样的处理方式。
+#### 这个if判断是hash值为MOVED，也就是-1。这是由于集群正在扩容以及对原有的节点进行移位，
+
+#### 再看到下面这个if判断,这个判断就是若table桶位值已经存在了节点，那么就需要在后面接节点组成链表，链表长度超过阈值的时候，也要转成红黑树。在jdk 1.7的时候并不是这种处理方式的，但是在jdk 1.8的时候变成了和HashMap同样的处理方式。
 ```
 	else {
         V oldVal = null;
@@ -196,3 +219,10 @@
         return null;
     }
 ```
+
+
+###  RESIZE_STAMP_SHIFT + RESIZE_STAMP_BITS = 32
+###  sizeCtl:默认为0,用来控制table的初始化和扩容操作.它的数值有以下含义
+-1 :代表table正在初始化,其他线程应该交出CPU时间片,退出
+-N: 表示正有N-1个线程执行扩容操作
+>0: 如果table已经初始化,代表table容量,默认为table大小的0.75,如果还未初始化,代表需要初始化的大小
