@@ -2,7 +2,7 @@
 ## 前言
 #### 今天开始好好记录一下学习dubbo的各种小细节。
 ## 正文
-#### 一开始我们直接先通过dubbo官方的一个图来引入我们今天的主题![dubbo](img/dubbo-frameworka.jpg)。好的，相信如果大家是第一次看到这个图，肯定会被看的眼花缭乱。今天我们不会直接开始分析每个流程，直接先看到里面从上到下，有Service，Config，Proxy，Registry，Cluster，Monitor，Protocol，Exchange，Transport，Serialize，总共十层，每一层都是dubbo中非常重要的一个模块。在之后的文章中，我们就会对其进行分析。但是今天，我们先看到另一个事情。官方有这么一句话
+#### 一开始我们直接先通过dubbo官方的一个图来引入我们今天的主题![dubbo](img/dubbo-framework.jpg)。好的，相信如果大家是第一次看到这个图，肯定会被看的眼花缭乱。今天我们不会直接开始分析每个流程，直接先看到里面从上到下，有Service，Config，Proxy，Registry，Cluster，Monitor，Protocol，Exchange，Transport，Serialize，总共十层，每一层都是dubbo中非常重要的一个模块。在之后的文章中，我们就会对其进行分析。但是今天，我们先看到另一个事情。官方有这么一句话
 > Service 和 Config 层为 API，其它各层均为 SPI 
 
 #### 这句话我们要怎么去理解呢。其它层是SPI是什么意思呢？要解释这个，我们要先看到SPI是什么？其实SPI是java自带的一种机制，而Dubbo对其进行了更好的改造和适配，让其遍布于Dubbo源码的每个角落，每个SPI都可以看做一个扩展点。所以其中8层都是SPI，就是说明其他八层都可以供开发人员扩展自己需要的组件。
