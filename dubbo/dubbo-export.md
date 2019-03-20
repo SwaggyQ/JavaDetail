@@ -3,8 +3,8 @@
 #### 前一篇文章捋了一遍dubbo中spi的扩展机制。这篇文章我们将来看一下dubbo中的服务暴露是什么意思。
 ## 正文
 #### 因为dubbo本质就是一个rpc的调用过程，也就是会有服务的提供者和调用者。服务暴露就是提供者将自己的服务暴露在调用者能调用到的地方去。
-#### 以spring配置的方式为例，![dubbo-xml](img/dubb-xml.tiff)
-#### 我们会在提供者的项目中配置这么一个文件，这个文件最后会被对象化为ServiceBean中，这个类的继承关系如图![dubbo-class](img/dubb-class.jpeg)
+#### 以spring配置的方式为例，![dubbo-xml](img/dubbo-xml.tiff)
+#### 我们会在提供者的项目中配置这么一个文件，这个文件最后会被对象化为ServiceBean中，这个类的继承关系如图![dubbo-class](img/dubbo-class.jpeg)
 #### 可以看到，除了Spring的一些接口外，主要继承了ServiceConfig。这也是我们今天要重点看的类。所有我们之前的配置文件都会对应这个类中的一个变量，例如methods，interfaceName，interfaceClass。还有两句
 ```
     private static final Protocol protocol = ExtensionLoader.getExtensionLoader(Protocol.class).getAdaptiveExtension();
