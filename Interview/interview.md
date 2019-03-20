@@ -5,3 +5,6 @@
 4: 对象头里有什么
 5: 锁的膨胀
 6: java 8的一些语法以及原理，stream，lambda
+7: mysql是否命中索引
+8: linux命令  对文件的第二列排序
+9: top,jmap,jstack
