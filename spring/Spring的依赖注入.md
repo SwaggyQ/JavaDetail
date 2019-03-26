@@ -387,6 +387,29 @@ public Object getSingleton(String beanName, ObjectFactory singletonFactory) {
 ```
 #### 实在太绕了
 
+
+
+
+
+
+
+
+
+
+
+
+Spring Bean 支持 5 种 Scope ，分别如下：
+
+Singleton - 每个 Spring IoC 容器仅有一个单 Bean 实例。默认
+Prototype - 每次请求都会产生一个新的实例。
+Request - 每一次 HTTP 请求都会产生一个新的 Bean 实例，并且该 Bean 仅在当前 HTTP 请求内有效。
+Session - 每一个的 Session 都会产生一个新的 Bean 实例，同时该 Bean 仅在当前 HTTP Session 内有效。
+Application - 每一个 Web Application 都会产生一个新的 Bean ，同时该 Bean 仅在当前 Web Application 内有效。
+
+
+
+
+
 SingletonObjects : bean name -> bean instance
 SingletonFactories : bean name -> Object Factory
 earlySingletonObjects : bean name -> bean instance ,当bean还在创建的时候，可以从这边得到，所以解决循环依赖的问题
