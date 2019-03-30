@@ -16,11 +16,8 @@
 
 
 		// Application.java
-		Resource resource = new ClassPathResource("application.xml");
-        DefaultListableBeanFactory factory = new DefaultListableBeanFactory();
-        XmlBeanDefinitionReader reader = new XmlBeanDefinitionReader(factory);//新增XMl阅读器
-        reader.loadBeanDefinitions(resource);
-        MyTestStr myTestStr = (MyTestStr) factory.getBean("myTestStr");
+		ApplicationContext applicationContext = new ClassPathXmlApplicationContext("application.xml");
+        MyTestStr myTestStr = (MyTestStr) applicationContext.getBean("myTestStr");
         System.out.println(myTestStr.getTestStr());
 ```
 #### 上面的例子是最基本的控制反转的例子，今天本文只会关注一行代码，也就是
@@ -84,6 +81,137 @@
 		return (singletonObject != NULL_OBJECT ? singletonObject : null);
 	}
 ```
+#### 如果是第一次去获得bean，则会返回null，并在后面的代码中去得到
+```
+	final RootBeanDefinition mbd = getMergedLocalBeanDefinition(beanName);
+```
+#### 同样的，会先去得到bean的定义，然后根据bean配置的scope，来判断以什么方式去创建bean。默认为sigleton模式，即会调用到下面的方法中
+```
+	if (mbd.isSingleton()) {
+		sharedInstance = getSingleton(beanName, new ObjectFactory<Object>() {
+			public Object getObject() throws BeansException {
+				...			
+			});
+		bean = getObjectForBeanInstance(sharedInstance, name, beanName, mbd);
+	}
+```
+#### 可以看到，主要是调用了getSingleton方法
+```
+	synchronized (this.singletonObjects) {
+		// 同样先检查缓存中是否存在
+		Object singletonObject = this.singletonObjects.get(beanName);
+		if (singletonObject == null) {
+			if (this.singletonsCurrentlyInDestruction) {
+				throw new BeanCreationNotAllowedException(beanName,
+						"Singleton bean creation not allowed while the singletons of this factory are in destruction " +
+						"(Do not request a bean from a BeanFactory in a destroy method implementation!)");
+			}
+			if (logger.isDebugEnabled()) {
+				logger.debug("Creating shared instance of singleton bean '" + beanName + "'");
+			}
+			// 创建前再确认一次
+			beforeSingletonCreation(beanName);
+			boolean recordSuppressedExceptions = (this.suppressedExceptions == null);
+			if (recordSuppressedExceptions) {
+				this.suppressedExceptions = new LinkedHashSet<Exception>();
+			}
+			try {
+				// 调用匿名类的方法
+				singletonObject = singletonFactory.getObject();
+			}
+			catch (BeanCreationException ex) {
+				if (recordSuppressedExceptions) {
+					for (Exception suppressedException : this.suppressedExceptions) {
+						ex.addRelatedCause(suppressedException);
+					}
+				}
+				throw ex;
+			}
+			finally {
+				if (recordSuppressedExceptions) {
+					this.suppressedExceptions = null;
+				}
+				// 再检查一遍
+				afterSingletonCreation(beanName);
+			}
+			addSingleton(beanName, singletonObject);
+		}
+		return (singletonObject != NULL_OBJECT ? singletonObject : null);
+	}
+```
+#### 上面调用了很多方法，但是除去很多的检查的方法，最重要的就是singletonFactory.getObject()这一句。这个就是之前定义的匿名类，所以我们回去看看这个方法做了什么操作
+```
+	public Object getObject() throws BeansException {
+		try {
+			return createBean(beanName, mbd, args);
+		}
+		catch (BeansException ex) {
+			// Explicitly remove instance from singleton cache: It might have been put there
+			// eagerly by the creation process, to allow for circular reference resolution.
+			// Also remove any beans that received a temporary reference to the bean.
+			destroySingleton(beanName);
+			throw ex;
+		}
+	}
+```
+#### 就是调用了createBean方法，继续看进去
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #### 上述代码主要是为了检查是否已经在缓存中存在了相应的bean instance，避免重复创建。现在再来看看接下来做了什么。
 ```		
 		// 如果已经得到了共享的instance，且未传入参数
@@ -124,7 +252,7 @@
 			FactoryBean<?> factory = (FactoryBean<?>) beanInstance;
 			// 若之前加载的配置中定义了当前的bean name
 			if (mbd == null && containsBeanDefinition(beanName)) {
-				// 融合相关的配置 ？ 
+				// 得到当前bean相关的配置信息 
 				mbd = getMergedLocalBeanDefinition(beanName);
 			}
 			// mdb是否由程序直接生成?
