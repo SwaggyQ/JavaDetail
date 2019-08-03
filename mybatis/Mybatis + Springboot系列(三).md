@@ -162,4 +162,50 @@ public class ClassPathMapperScanner extends ClassPathBeanDefinitionScanner {
     return getSqlSession().getMapper(this.mapperInterface);
   }
 ````
-#### 这块代码我们放在下一篇文章中去深究，总结一下我们刚看了@Mapper注解的类是怎么被spring框架加入到bean容器的。现在我们再简单看一下@MapperScan注解是怎么工作的
+#### 这块代码我们放在下一篇文章中去深究，总结一下我们刚看了@Mapper注解的类是怎么被spring框架加入到bean容器的。现在我们再简单看一下@MapperScan注解是怎么工作的。
+
+
+
+
+.....TODO...
+
+
+
+#### 上面我们看到了我们的mapper怎么被注册到spring容器中，现在看看怎么重新注入到我们的项目里。上面的文章我们也说到了我们所有的bean在注册的时候都会被改为MapperFactoryBean类型的工厂类，那么相应的，在bean的注入的时候，spring框架会通过工厂类的getObject方法得到我们想要的类。
+````
+  @Override
+  public T getObject() throws Exception {
+    return getSqlSession().getMapper(this.mapperInterface);
+  }
+````
+#### 可以看到总共分为两个步骤，一个是获取SqlSession，也就是每次操作的会话，第二步是根据对应的mapper接口从这个会话中获取对应的Mapper。我们一步步断点代码会发现，最终会走到MapperRegistry的getMapper方法中，我们直接看到这段代码。
+````
+  public <T> T getMapper(Class<T> type, SqlSession sqlSession) {
+  	// 通过type，得到mapperProxyFactory类
+    final MapperProxyFactory<T> mapperProxyFactory = (MapperProxyFactory<T>) knownMappers.get(type);
+    if (mapperProxyFactory == null) {
+      throw new BindingException("Type " + type + " is not known to the MapperRegistry.");
+    }
+    try {
+    	// 再通过mapperProxyFactory类，在当前会话中，得到一个新的实例
+      return mapperProxyFactory.newInstance(sqlSession);
+    } catch (Exception e) {
+      throw new BindingException("Error getting mapper instance. Cause: " + e, e);
+    }
+  }
+````
+#### 所以继续看到mapperProxyFactory实例化的过程
+````
+  public T newInstance(SqlSession sqlSession) {
+  	// 先得到一个MapperFactory对应
+    final MapperProxy<T> mapperProxy = new MapperProxy<>(sqlSession, mapperInterface, methodCache);
+    return newInstance(mapperProxy);
+  }
+  
+  // 又是熟悉的proxy模式，用mapperProxy对我们写的mapper类进行增强
+  @SuppressWarnings("unchecked")
+  protected T newInstance(MapperProxy<T> mapperProxy) {
+    return (T) Proxy.newProxyInstance(mapperInterface.getClassLoader(), new Class[] { mapperInterface }, mapperProxy);
+  }
+````
+#### 至此我们就得到了一个由MapperProxy增强代理的mapper对象，并注入到了我们的项目中。我们就可以直接用这个类来完成我们想要的操作了。
