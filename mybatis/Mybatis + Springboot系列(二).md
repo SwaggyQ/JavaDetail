@@ -1,4 +1,4 @@
-# Mybatis + Springboot系列(二)
+# Mybatis + Springboot系列(二) 
 ##  前文
 #### 系列文章的第二篇，我们会主要重点关注一下springboot为mybatis带来的自动装配的部分，了解一下为什么这么便利。
 ## 正文
