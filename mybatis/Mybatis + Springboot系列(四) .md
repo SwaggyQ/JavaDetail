@@ -193,10 +193,10 @@ public static class MethodSignature {
 
 #### 又是熟悉的proxy模式，直接看到SqlSessionInterceptor增强类中的内容。
 ````
-private class SqlSessionInterceptor implements InvocationHandler {
+  private class SqlSessionInterceptor implements InvocationHandler {
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-      // 可以看到每次执行前都会先去getSqlSession
+      // 可以看到每次执行前都会先去getSqlSession，里面其实是一个threadLocal
       SqlSession sqlSession = getSqlSession(
           SqlSessionTemplate.this.sqlSessionFactory,
           SqlSessionTemplate.this.executorType,
@@ -215,5 +215,27 @@ private class SqlSessionInterceptor implements InvocationHandler {
         ...
       }
     }
+  }
+  
+  
+  
+  public static SqlSession getSqlSession(SqlSessionFactory sessionFactory, ExecutorType executorType, PersistenceExceptionTranslator exceptionTranslator) {
+
+    notNull(sessionFactory, NO_SQL_SESSION_FACTORY_SPECIFIED);
+    notNull(executorType, NO_EXECUTOR_TYPE_SPECIFIED);
+
+    SqlSessionHolder holder = (SqlSessionHolder) TransactionSynchronizationManager.getResource(sessionFactory);
+
+    SqlSession session = sessionHolder(executorType, holder);
+    if (session != null) {
+      return session;
+    }
+
+    LOGGER.debug(() -> "Creating a new SqlSession");
+    session = sessionFactory.openSession(executorType);
+
+    registerSessionHolder(sessionFactory, executorType, exceptionTranslator, session);
+
+    return session;
   }
 ````
