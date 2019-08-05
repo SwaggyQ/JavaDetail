@@ -196,7 +196,7 @@ public static class MethodSignature {
   private class SqlSessionInterceptor implements InvocationHandler {
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-      // 可以看到每次执行前都会先去getSqlSession，里面其实是一个threadLocal
+      // 可以看到每次执行前都会先去getSqlSession，里面其实是一个threadLocal，本文中对这个方法也先跳过
       SqlSession sqlSession = getSqlSession(
           SqlSessionTemplate.this.sqlSessionFactory,
           SqlSessionTemplate.this.executorType,
@@ -216,26 +216,18 @@ public static class MethodSignature {
       }
     }
   }
-  
-  
-  
-  public static SqlSession getSqlSession(SqlSessionFactory sessionFactory, ExecutorType executorType, PersistenceExceptionTranslator exceptionTranslator) {
-
-    notNull(sessionFactory, NO_SQL_SESSION_FACTORY_SPECIFIED);
-    notNull(executorType, NO_EXECUTOR_TYPE_SPECIFIED);
-
-    SqlSessionHolder holder = (SqlSessionHolder) TransactionSynchronizationManager.getResource(sessionFactory);
-
-    SqlSession session = sessionHolder(executorType, holder);
-    if (session != null) {
-      return session;
+````
+#### 看到在执行方法的前后做了操作之后，最终还是回到了执行method方法。
+````
+  @Override
+  public <E> List<E> selectList(String statement, Object parameter, RowBounds rowBounds) {
+    try {
+      MappedStatement ms = configuration.getMappedStatement(statement);
+      return executor.query(ms, wrapCollection(parameter), rowBounds, Executor.NO_RESULT_HANDLER);
+    } catch (Exception e) {
+      throw ExceptionFactory.wrapException("Error querying database.  Cause: " + e, e);
+    } finally {
+      ErrorContext.instance().reset();
     }
-
-    LOGGER.debug(() -> "Creating a new SqlSession");
-    session = sessionFactory.openSession(executorType);
-
-    registerSessionHolder(sessionFactory, executorType, exceptionTranslator, session);
-
-    return session;
   }
 ````
