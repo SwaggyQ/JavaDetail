@@ -223,11 +223,114 @@ public static class MethodSignature {
   public <E> List<E> selectList(String statement, Object parameter, RowBounds rowBounds) {
     try {
       MappedStatement ms = configuration.getMappedStatement(statement);
+      // 最后可以看到会由一个executor来执行最终的方法
       return executor.query(ms, wrapCollection(parameter), rowBounds, Executor.NO_RESULT_HANDLER);
     } catch (Exception e) {
       throw ExceptionFactory.wrapException("Error querying database.  Cause: " + e, e);
     } finally {
       ErrorContext.instance().reset();
     }
+  }
+````
+#### 我们会看到最终会由一个executor的类来执行最后的操作，这个类的创建是由Configuration来生成的，这个配置类在整个mybatis的流程中都扮演了非常重要的角色，我们在后面会专门用一篇文章来描述，我们这边先直接看到里面的方法。
+````
+  public Executor newExecutor(Transaction transaction, ExecutorType executorType) {
+    executorType = executorType == null ? defaultExecutorType : executorType;
+    executorType = executorType == null ? ExecutorType.SIMPLE : executorType;
+    Executor executor;
+    // 总共有以下几种类型
+    - Batch
+    - Reuse
+    - Simple
+    - Caching
+    if (ExecutorType.BATCH == executorType) {
+      executor = new BatchExecutor(this, transaction);
+    } else if (ExecutorType.REUSE == executorType) {
+      executor = new ReuseExecutor(this, transaction);
+    } else {
+      executor = new SimpleExecutor(this, transaction);
+    }
+    // 是否包装一层缓存
+    if (cacheEnabled) {
+      executor = new CachingExecutor(executor);
+    }
+    executor = (Executor) interceptorChain.pluginAll(executor);
+    return executor;
+  }
+````
+#### 我们在本文中的例子会用Caching + Simple的组合，现在我们看到query方法
+````
+  @Override
+  public <E> List<E> query(MappedStatement ms, Object parameterObject, RowBounds rowBounds, ResultHandler resultHandler) throws SQLException {
+  	// 最后真正执行的sql的载体
+    BoundSql boundSql = ms.getBoundSql(parameterObject);
+    // 获取唯一的缓存key
+    CacheKey key = createCacheKey(ms, parameterObject, rowBounds, boundSql);
+    // 真正的query方法
+    return query(ms, parameterObject, rowBounds, resultHandler, key, boundSql);
+  }
+
+  @Override
+  public <E> List<E> query(MappedStatement ms, Object parameterObject, RowBounds rowBounds, ResultHandler resultHandler, CacheKey key, BoundSql boundSql)
+      throws SQLException {
+      // 得到缓存
+    Cache cache = ms.getCache();
+    if (cache != null) {
+    	// 是否需要清空缓存
+      flushCacheIfRequired(ms);
+      if (ms.isUseCache() && resultHandler == null) {
+      	// 不支持缓存输出类型的sql
+        ensureNoOutParams(ms, boundSql);
+        @SuppressWarnings("unchecked")
+        // 从真正管理缓存的tcm中获取缓存结果
+        List<E> list = (List<E>) tcm.getObject(cache, key);
+        if (list == null) {
+        	// 如果没有在缓存中得到结果，则需要新的读取并放入缓存，这里的delegate.query其实就是调用SimpleExecutor的方法
+          list = delegate.query(ms, parameterObject, rowBounds, resultHandler, key, boundSql);
+          tcm.putObject(cache, key, list); // issue #578 and #116
+        }
+        return list;
+      }
+    }
+    return delegate.query(ms, parameterObject, rowBounds, resultHandler, key, boundSql);
+  }
+  
+  
+  // BaseExecutor.java
+  @SuppressWarnings("unchecked")
+  @Override
+  public <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler, CacheKey key, BoundSql boundSql) throws SQLException {
+    ErrorContext.instance().resource(ms.getResource()).activity("executing a query").object(ms.getId());
+    if (closed) {
+      throw new ExecutorException("Executor was closed.");
+    }
+    // 
+    if (queryStack == 0 && ms.isFlushCacheRequired()) {
+      clearLocalCache();
+    }
+    List<E> list;
+    try {
+      queryStack++;
+      list = resultHandler == null ? (List<E>) localCache.getObject(key) : null;
+      if (list != null) {
+        handleLocallyCachedOutputParameters(ms, key, parameter, boundSql);
+      } else {
+        list = queryFromDatabase(ms, parameter, rowBounds, resultHandler, key, boundSql);
+      }
+    } finally {
+      queryStack--;
+    }
+    if (queryStack == 0) {
+      for (DeferredLoad deferredLoad : deferredLoads) {
+        deferredLoad.load();
+      }
+      // issue #601
+      deferredLoads.clear();
+      if (configuration.getLocalCacheScope() == LocalCacheScope.STATEMENT) {
+        // issue #482
+        clearLocalCache();
+      }
+    }
+    return list;
   }
 ````
