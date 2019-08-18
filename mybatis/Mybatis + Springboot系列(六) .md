@@ -155,10 +155,11 @@
       if (ms.isUseCache() && resultHandler == null) {
         ensureNoOutParams(ms, boundSql);
         @SuppressWarnings("unchecked")
-        // 和一级缓存不同的是，二级缓存是由tcm管理的
+        // 和一级缓存不同的是，二级缓存是由tcm管理的，如果返回了，则直接返回缓存的结果
         List<E> list = (List<E>) tcm.getObject(cache, key);
         if (list == null) {
           list = delegate.query(ms, parameterObject, rowBounds, resultHandler, key, boundSql);
+          // 若是新查询结果，则放入缓存中
           tcm.putObject(cache, key, list); // issue #578 and #116
         }
         return list;
@@ -167,3 +168,4 @@
     return delegate.query(ms, parameterObject, rowBounds, resultHandler, key, boundSql);
   }
 ````
+#### 由上可知，我们在真正调用每个mapper接口的时候，会涉及到的所有的缓存类型基本就是分为第一和第二层缓存，每一级缓存之间的区别我们也已经有所说明了。
