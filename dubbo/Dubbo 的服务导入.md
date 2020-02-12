@@ -6,6 +6,14 @@
 
 本文将从一个细节出发，以小见大窥探一下关于dubbo服务的引入过程。为了说清楚这三者的关系，本文会稍微讲一下服务引用的过程。
 
+
+
+Directory是储存多个invoker，并动态增删改
+
+Cluster负责负载均衡
+
+
+
 ## 正文
 
 熟悉源码的人应该不难发现，我们服务导入的关键起始类是ReferenceBean，这个是一个工厂bean的实现，同时继承了ReferenceConfig，由父类实现大部分的导入逻辑。由于是一个工厂类，所以很容易发现在我们代码中真正注入对应的dubbo服务时，会调用FactoryBean的getObject()方法，实例化一个真正的对象。而这个方法也正是我们今天想讲的逻辑入口，我们看到对应的方法。
@@ -31,7 +39,7 @@
     }
 ````
 
-所以最后返回的这个ref，就应该是我们真正想要调用的dubbo服务的一个代理类，所以最重要的就是这个ref是怎么被生成的，所以继续看到init()方法。
+所以最后返回的这个ref，w就应该是我们真正想要调用的dubbo服务的一个代理类，所以最重要的就是这个ref是怎么被生成的，所以继续看到init()方法。
 
 ````java
     private void init() {
@@ -88,9 +96,41 @@
 
 ###Protocol.refer()
 
+##### 这边简化一下我们的赘述流程，直接看到Protocol调用链中的两个环节。RegistryProtocol和DubboProtocol的refer方法。
+
+````
+    # RegistryProtocol.java
+    
+    private <T> Invoker<T> doRefer(Cluster cluster, Registry registry, Class<T> type, URL url) {
+        RegistryDirectory<T> directory = new RegistryDirectory<T>(type, url);
+        directory.setRegistry(registry);
+        directory.setProtocol(protocol);
+        // all attributes of REFER_KEY
+        Map<String, String> parameters = new HashMap<String, String>(directory.getUrl().getParameters());
+        URL subscribeUrl = new URL(Constants.CONSUMER_PROTOCOL, parameters.remove(Constants.REGISTER_IP_KEY), 0, type.getName(), parameters);
+        if (!Constants.ANY_VALUE.equals(url.getServiceInterface())
+                && url.getParameter(Constants.REGISTER_KEY, true)) {
+            registry.register(subscribeUrl.addParameters(Constants.CATEGORY_KEY, Constants.CONSUMERS_CATEGORY,
+                    Constants.CHECK_KEY, String.valueOf(false)));
+        }
+        directory.subscribe(subscribeUrl.addParameter(Constants.CATEGORY_KEY,
+                Constants.PROVIDERS_CATEGORY
+                        + "," + Constants.CONFIGURATORS_CATEGORY
+                        + "," + Constants.ROUTERS_CATEGORY));
+
+        Invoker invoker = cluster.join(directory);
+        ProviderConsumerRegTable.registerConsumer(invoker, url, subscribeUrl, directory);
+        return invoker;
+    }
+````
+
+1. 构建了一个RegistryDirectory类，
+
 
 
 ### Cluster.join()
+
+MockClusterWrapper(FailOverCluster)
 
 ###  ProxyFactory.getProxy()
 

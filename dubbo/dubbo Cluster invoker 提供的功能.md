@@ -1,0 +1,3 @@
+dubbo Cluster invoker 提供的功能
+
+Cluster其实就是一个包装器，包装多个invoker，然后内部对多个invoker提供不同功能的调用模式
