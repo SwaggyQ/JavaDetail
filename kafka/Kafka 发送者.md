@@ -1,14 +1,81 @@
-Kafka 发送者
+# Kafka 发送者
 
 
 
 ### Cluster
 
-producer分为两个线程，一个向accumulator中堆积record，另一个线程从中获取
+
+
+producer分为两个线程，一个向accumulator中堆积record
+
+###### 堆积record逻辑
+
+// TODO
 
 
 
-### Sender
+
+
+另一个线程从中获取
+
+
+
+重点需要讲一下Sender这个类，这个类本质上是一个runnable类。看一下sender类在producer中被构造时传入的参数，作为我们分析的入口。
+
+```java
+this.sender = new Sender(logContext, // 日志封装
+        client, // 封装与broker的通信的网络客户端
+        this.metadata, // 
+        this.accumulator, // 消息数据缓冲池，作为消息传递的媒介，供两个线程通信
+        maxInflightRequests == 1, // 标识消息是否保持完全有序的布尔值，通过maxInflightRequests值是否为1判断，这个值之后会说到
+        config.getInt(ProducerConfig.MAX_REQUEST_SIZE_CONFIG), // 请求的最大大小，默认为1M
+        acks,
+        retries,
+        metricsRegistry.senderMetrics, 
+        Time.SYSTEM,
+        this.requestTimeoutMs,
+        config.getLong(ProducerConfig.RETRY_BACKOFF_MS_CONFIG),
+        this.transactionManager, // 全局的事务管理器，默认情况下为null
+        apiVersions); // 全局的版本控制
+String ioThreadName = NETWORK_THREAD_PREFIX + " | " + clientId;
+this.ioThread = new KafkaThread(ioThreadName, this.sender, true); // 构建线程并启动
+this.ioThread.start();
+```
+
+既然是一个Runnable的实现类，所以我们直接关注到run方法
+
+
+
+```java
+public void run() {
+    log.debug("Starting Kafka producer I/O thread.");
+
+    // main loop, runs until close is called
+    // 在没被主动close的情况下，持续永真循环
+    while (running) {
+        try {
+            run(time.milliseconds());
+        } catch (Exception e) {
+            log.error("Uncaught error in kafka producer I/O thread: ", e);
+        }
+    }
+
+    log.debug("Beginning shutdown of Kafka producer I/O thread, sending remaining records.");
+}
+```
+
+# 大篇幅讲述run方法，先省略了事务管理器代码
+
+```java
+void run(long now) {
+    long pollTimeout = sendProducerData(now);
+    client.poll(pollTimeout, now);
+}
+```
+
+
+
+Sender
 
 **KafkaClient client**
 **kafka 网络通信客户端，主要封装与 broker 的网络通信。**
